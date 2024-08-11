@@ -17,9 +17,12 @@ target directory (without the 'game' in the dir's name) with all of it's content
 Writing a JSON file that has metadata about the games. (What the game directories are and how many of them exist)
 +
 Compiling the code inside of a directory and running it using a subprocess
+
 """
 
 GAME_DIR_PATTERN = 'game'
+GAME_CODE_EXTENSION = ".go" # We will search for this type of file to compile
+GAME_CODE_COMMAND = ["go", "build"] # A bank for the commands that we will use to run later on 
 
 def find_all_game_paths(source):
     game_paths = []
@@ -83,6 +86,35 @@ def make_json_metadata_file(path, game_dirs):
 
 
 
+def compile_game_code(path): # Will determine the name of the code file in each directory (if it's there) for further compilation 
+    code_file_name = None
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            if file.endswith(GAME_CODE_EXTENSION): # Avoid using if GAME_CODE_EXTENSION in file: because it could be .go.py 
+                code_file_name = file
+                break
+        break
+
+    if code_file_name == None:
+        return 
+    
+    command = GAME_CODE_COMMAND + [code_file_name] # Constructing a command with the needed file to run in a different function.
+    run_command(command, path)
+
+
+
+def run_command(command, path): # We will need the path that we want to be running this command from
+
+    cwd = os.getcwd() # for running the command inside the directory our code is instead where the python script is (That's what we want here!)
+    os.chdir(path)
+
+    result = run(command, stdout=PIPE, stdin=PIPE, universal_newlines=True, shell=True)
+    print("compile result", result)
+
+    os.chdir(cwd) # Good practice is we're going to change our directory back to the cwd before we changed directories into this path, to make sure when we run this command another time we don't get any potential errors.
+
+
+
 """
 Second Step
 |
@@ -109,7 +141,9 @@ def main(source, target):
         dest_path = os.path.join(target_path, dest) 
         # Getting the new destination so we will not only copy the internal files of the source but create a directory inside the target so there will be a separated directory with the copied stuff
 
-        copy_and_overwrite(src, dest_path) # Actually copying\
+        copy_and_overwrite(src, dest_path) # Actually copying
+
+        compile_game_code(dest_path) # The directory exists with the copied directory so we will need to compile the code there now and move to the next directory. 
 
     json_path = os.path.join(target_path, "metadata.json") # The second value is a name that we'll give to the JSON that we came up with
     make_json_metadata_file(json_path, new_game_dirs)
